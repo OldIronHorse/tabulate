@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: UPL-1.0
 # Copyright (c) 2026 Simon Redding
 
+import unicode.Grapheme
+
 ## A text table formatter.
 ##
 ## Build a `Table` from one of the style constructors ([Table.plain],
@@ -139,7 +141,7 @@ Table :: {
     format = |table, rows| {
         max_widths = rows
             .prepend(table.columns.map(|c| c.name))
-            .map(|row| row.map(Str.count_utf8_bytes))
+            .map(|row| row.map(|s| Grapheme.slices(s).len()))
             .fold([], |mws, row|
                     mws.map2(row, U64.max)
                         .concat(mws.drop_first(row.len()))
@@ -223,15 +225,15 @@ format_field = |field, width, col|
         Left => pad_right(field, width)
         Right => pad_left(field, width)
         Centre => {
-            len = field.count_utf8_bytes()
+            len = Grapheme.slices(field).len()
             pad = (width - len) / 2
             "${" ".repeat(pad)}${field}${" ".repeat(width - len - pad)}"
         }
     }
 
 # Internal helpers: pad a string with spaces to a width (in UTF-8 bytes).
-pad_right = |s, w| "${s}${" ".repeat(w - s.count_utf8_bytes())}"
-pad_left = |s, w| "${" ".repeat(w - s.count_utf8_bytes())}${s}"
+pad_right = |s, w| "${s}${" ".repeat(w - Grapheme.slices(s).len())}"
+pad_left = |s, w| "${" ".repeat(w - Grapheme.slices(s).len())}${s}"
 
 expect "one " == pad_right("one", 4)
 
