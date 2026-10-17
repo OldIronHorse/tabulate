@@ -1,0 +1,121 @@
+name: Release
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Release version, for example 1.2.3 or 1.0.0-rc1
+        required: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+
+# Serialize release runs in one group; PR validation runs get per-ref groups
+# so they never cancel a queued release run.
+concurrency:
+  group: ${{ github.event_name == 'workflow_dispatch' && format('release-{0}', github.repository) || format('release-validate-{0}-{1}', github.repository, github.ref) }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.validate.outputs.release_version }}
+      docs_version: ${{ steps.validate.outputs.docs_version }}
+      test_matrix: ${{ steps.bundles.outputs.test_matrix }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: roc-lang/setup-roc@v0.3.0
+        with:
+          version: nightly-new-compiler
+
+      - id: validate
+        uses: roc-lang/release-package/actions/validate-release@main
+        with:
+          release_version: ${{ github.event_name == 'workflow_dispatch' && inputs.release_version || '' }}
+          dry_run: ${{ github.event_name != 'workflow_dispatch' }}
+          github_token: ${{ github.token }}
+
+      - run: roc test package/main.roc
+
+      - id: previous
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: roc-lang/release-package/actions/resolve-previous-release@main
+        with:
+          github_token: ${{ github.token }}
+
+      - uses: roc-lang/release-package/actions/run-bump-check@main
+        with:
+          release_version: ${{ steps.validate.outputs.release_version }}
+          dry_run: ${{ github.event_name != 'workflow_dispatch' }}
+          previous_url: ${{ steps.previous.outputs.previous_url }}
+          bump_check: require
+          bump_entrypoint: package/main.roc
+
+      - run: mkdir dist && roc bundle package/main.roc --output-dir dist
+
+      - id: bundles
+        uses: roc-lang/release-package/actions/prepare-bundles@main
+        with:
+          bundle_glob: dist/*.tar.zst
+          test_os_json: '["ubuntu-latest"]'
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-bundles
+          path: .release/bundles/*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-metadata
+          path: |
+            .release/bump-output.txt
+            .release/previous-url.txt
+            .release/release-bundles.json
+            .release/test-matrix.json
+          if-no-files-found: error
+
+      - run: roc docs package/main.roc
+      
+      - id: docs
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: generated-docs
+          
+      - uses: actions/deploy-pages@v5
+
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-bundles
+          path: .release/bundles
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-metadata
+          path: .release
+
+      - uses: roc-lang/release-package/actions/make-release-notes@main
+        with:
+          release_version: ${{ needs.build.outputs.release_version }}
+          github_token: ${{ github.token }}
+
+      - uses: roc-lang/release-package/actions/publish-release@main
+        with:
+          release_version: ${{ needs.build.outputs.release_version }}
+          github_token: ${{ github.token }}
