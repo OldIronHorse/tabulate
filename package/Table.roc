@@ -116,8 +116,7 @@ Table :: {
 
     ## Formats `rows` as a table, returning one string per output line.
     ##
-    ## Each inner list is a row of cells. Column widths are measured in UTF-8
-    ## bytes, so text containing multi-byte characters may not line up.
+    ## Each inner list is a row of cells.
     ##
     ## - If the table has columns, a header (and its separator) is included.
     ## - Rows shorter than the table are padded with each column's default value.
