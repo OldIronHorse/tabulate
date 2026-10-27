@@ -62,7 +62,7 @@ Table(row) :: {
 
     col_at : U64, Str, (cell -> Str), ListColumnOpts -> Column
     col_at = |index, header, fmt, opts|
-        Table.column(header, |r| r.get(index).ok_or(opts.default) |> fmt, { align: opts.align })
+        Table.column(header, |r| r.get(index).map_ok(fmt).ok_or(opts.default), { align: opts.align })
 
     ## Returns a copy of the table with its columns replaced by `columns`.
     ##
@@ -86,7 +86,9 @@ Table(row) :: {
         rs1 = rs.map(|row| row.map3(max_widths, table.columns, |cell, mw, col| (Fmt.str |> Fmt.fit({ width: mw, align: col.align }))(cell)))
         match table.style {
             Plain => render_plain(max_widths, table.columns, rs1)
-            Pipe => render_pipe(table.columns, rs)
+            Pipe =>
+                render_pipe(table.columns, rs.map(|r|
+                    r.map(|cell| cell.replace_each("|", "\\|").replace_each("\n", "<br>"))))
             Grid => render_grid(max_widths, table.columns, rs1)
         }
     }
