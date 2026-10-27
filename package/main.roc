@@ -7,5 +7,5 @@
 package [
     Table,
 ] {
-    unicode: "https://github.com/roc-lang/unicode/releases/download/4.2.0/4W8SHzvwet9hH9qZewJ1J1CVQoH7YKA6zyijWFTB3y1w.tar.zst",
+    sfmt: "https://github.com/OldIronHorse/sfmt/releases/download/0.0.2/2c3gwzjDDu4nC866Y2exUPxaVBoADX6YMWL2asjjdcrw.tar.zst",
 }
