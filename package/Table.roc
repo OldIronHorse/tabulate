@@ -86,7 +86,7 @@ Table(row) :: {
         rs1 = rs.map(|row| row.map3(max_widths, table.columns, |cell, mw, col| (Fmt.str |> Fmt.fit({ width: mw, align: col.align }))(cell)))
         match table.style {
             Plain => render_plain(max_widths, table.columns, rs1)
-            Pipe => render_pipe(max_widths, table.columns, rs1)
+            Pipe => render_pipe(table.columns, rs)
             Grid => render_grid(max_widths, table.columns, rs1)
         }
     }
@@ -117,18 +117,18 @@ render_grid = |widths, cols, rows| {
         .intersperse(rule)).append(rule).prepend(rule)
 }
 
-render_pipe : List(U64), List(Table.Column), List(List(Str)) -> List(Str)
-render_pipe = |widths, cols, rows| [
-    "| ${cols.map2(widths, |col, mw| (Fmt.str |> Fmt.fit({ width: mw }))(col.header)) |> Str.join_with(" | ")} |",
-    "|${widths.map2(cols, |w, col| pipe_header_rule_cell(w, col.align)) |> Str.join_with("|")}|",
-].concat(rows.map(|row| "| ${row |> Str.join_with(" | ")} |"))
+render_pipe : List(Table.Column), List(List(Str)) -> List(Str)
+render_pipe = |cols, rows| [
+    "|${cols.map(|col| Fmt.str(col.header)) |> Str.join_with("|")}|",
+    "|${cols.map(|col| pipe_header_rule_cell(col.align)) |> Str.join_with("|")}|",
+].concat(rows.map(|row| "|${row |> Str.join_with("|")}|"))
 
-pipe_header_rule_cell : U64, [Left, Right, Center] -> Str
-pipe_header_rule_cell = |width, align|
+pipe_header_rule_cell : [Left, Right, Center] -> Str
+pipe_header_rule_cell = |align|
     match align {
-        Left => ":${"-".repeat(width + 1)}"
-        Right => "${"-".repeat(width + 1)}:"
-        Center => ":${"-".repeat(width)}:"
+        Left => ":--"
+        Right => "--:"
+        Center => ":-:"
     }
 
 expect ["one two three four"] == Table.plain({})
@@ -158,10 +158,10 @@ expect {
 
 expect {
     expected = [
-        "|      |     |       |       |",
-        "|:-----|:----|:------|:------|",
-        "| one  | two | three | four  |",
-        "| five | six | seven | eight |",
+        "|||||",
+        "|:--|:--|:--|:--|",
+        "|one|two|three|four|",
+        "|five|six|seven|eight|",
     ]
     actual =Table.pipe({})
         .with_columns([
@@ -214,10 +214,10 @@ expect {
 
 expect {
     expected = [
-        "| Dog  | Cat | Antelope | Sheep |",
-        "|:-----|:----|:---------|:------|",
-        "| one  | two | three    | four  |",
-        "| five | six | seven    | eight |",
+        "|Dog|Cat|Antelope|Sheep|",
+        "|:--|:--|:--|:--|",
+        "|one|two|three|four|",
+        "|five|six|seven|eight|",
     ]
     actual = Table.pipe({})
         .with_columns([
@@ -232,10 +232,10 @@ expect {
 
 expect {
     expected = [
-        "| Dog  | Cat | Antelope | Sheep |",
-        "|:-----|:----|:---------|:------|",
-        "| one  | two |          |       |",
-        "| five | six | seven    | eight |",
+        "|Dog|Cat|Antelope|Sheep|",
+        "|:--|:--|:--|:--|",
+        "|one|two|||",
+        "|five|six|seven|eight|",
     ]
     actual = Table.pipe({})
         .with_columns([
@@ -250,10 +250,10 @@ expect {
 
 expect {
     expected = [
-        "| Dog  | Cat | Antelope | Sheep |",
-        "|:-----|:----|:---------|:------|",
-        "| one  | two |          | N/A   |",
-        "| five | six | seven    | eight |",
+        "|Dog|Cat|Antelope|Sheep|",
+        "|:--|:--|:--|:--|",
+        "|one|two||N/A|",
+        "|five|six|seven|eight|",
     ]
     actual = Table.pipe({})
         .with_columns([
@@ -326,10 +326,10 @@ expect {
 
 expect {
     expected = [
-        "| Dog  | Cat | Antelope | Sheep |",
-        "|:-----|:----|---------:|:------|",
-        "| one  | two |    three | four  |",
-        "| five | six |    seven | eight |",
+        "|Dog|Cat|Antelope|Sheep|",
+        "|:--|:--|--:|:--|",
+        "|one|two|three|four|",
+        "|five|six|seven|eight|",
     ]
     actual = Table.pipe({})
         .with_columns([
@@ -343,10 +343,10 @@ expect {
 }
 expect {
     expected = [
-        "| Dog  | Cat | Antelope | Sheep |",
-        "|:-----|:----|:--------:|:------|",
-        "| one  | two |  three   | four  |",
-        "| five | six |  seven   | eight |",
+        "|Dog|Cat|Antelope|Sheep|",
+        "|:--|:--|:-:|:--|",
+        "|one|two|three|four|",
+        "|five|six|seven|eight|",
     ]
     actual = Table.pipe({})
         .with_columns([
@@ -361,12 +361,12 @@ expect {
 
 expect {
     expected = [
-        "| Item     | Price |",
-        "|:---------|------:|",
-        "| pen      | £1.50 |",
-        "| pencil   | £0.75 |",
-        "| notebook | £7.00 |",
-        "| ink      | £0.00 |",
+        "|Item|Price|",
+        "|:--|--:|",
+        "|pen|£1.50|",
+        "|pencil|£0.75|",
+        "|notebook|£7.00|",
+        "|ink|£0.00|",
     ]
     actual = Table.pipe({})
         .with_columns([
