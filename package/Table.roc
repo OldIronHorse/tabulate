@@ -49,20 +49,28 @@ Table(row) :: {
     Column(row) := {
         header : Str,
         fmt: row -> Str,
-        align: [Left, Right, Center] ?? Left,
+        align: [Left, Right, Center],
+        max_width: U64,
     }.{}
 
-    ColumnOpts := { align: [Left, Right, Center] ?? Left }
+    ColumnOpts := {
+        align: [Left, Right, Center] ?? Left,
+        max_width: U64 ?? U64.highest
+    }
 
     column : Str, (row -> Str), ColumnOpts -> Column
     column = |header, fmt, opts|
-        { header, fmt, align: opts.align }
+        { header, fmt, align: opts.align, max_width: opts.max_width }
 
-    ListColumnOpts := { align: [Left, Right, Center] ?? Left, default: Str ?? "" }
+    ListColumnOpts := {
+        align: [Left, Right, Center] ?? Left,
+        max_width: U64 ?? U64.highest
+        default: Str ?? ""
+    }
 
     col_at : U64, Str, (cell -> Str), ListColumnOpts -> Column
     col_at = |index, header, fmt, opts|
-        Table.column(header, |r| r.get(index).map_ok(fmt).ok_or(opts.default), { align: opts.align })
+        Table.column(header, |r| r.get(index).map_ok(fmt).ok_or(opts.default), { align: opts.align, max_width: opts.max_width })
 
     ## Returns a copy of the table with its columns replaced by `columns`.
     ##
@@ -82,7 +90,10 @@ Table(row) :: {
     format = |table, rows| {
         rs = rows.map(|row| table.columns.map(|col| (col.fmt)(row)))
         headers = table.columns.map(|col| col.header)
-        max_widths = rs.fold(headers.map(Fmt.width), |mws, cells| mws.map2(cells, |mw, cell| mw.max(Fmt.width(cell))))
+        max_widths = rs
+            .fold(headers.map(Fmt.width), |mws, cells|
+                mws.map2(cells, |mw, cell| mw.max(Fmt.width(cell))))
+            .map2(table.columns, |mw, col| mw.min(col.max_width))
         rs1 = rs.map(|row| row.map3(max_widths, table.columns, |cell, mw, col| (Fmt.str |> Fmt.fit({ width: mw, align: col.align }))(cell)))
         match table.style {
             Plain => render_plain(max_widths, table.columns, rs1)
@@ -99,7 +110,7 @@ render_plain = |widths, cols, rows|
     (if cols.any(|col| col.header.is_empty().not())
         [
             "${cols.map2(widths, |col, mw| (Fmt.str |> Fmt.fit({ width: mw }))(col.header)) |> Str.join_with(" ")}".trim_end(),
-            "${widths.map(|w| "-".repeat(w)) |> Str.join_with(" ")}".trim_end(),
+            "${widths.map(|w| "-".repeat(w)) |> Str.join_with(" ")}",
         ]
     else
         []
